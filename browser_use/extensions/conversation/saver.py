@@ -1,61 +1,73 @@
+"""Conversation saver extension for browser_use framework."""
+
 import json
 import logging
+import os
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Dict, Any, Optional
 
 logger = logging.getLogger(__name__)
 
 class ConversationSaver:
-    """Handles saving and loading of agent conversations."""
+    """Handles saving and managing conversation history."""
     
-    def __init__(self, save_path: Optional[str] = None):
-        self.save_path = save_path
+    def __init__(self, save_dir: Optional[str] = None):
+        """Initialize the conversation saver."""
+        self.save_dir = save_dir or os.path.join(os.path.expanduser('~'), '.browser_use', 'conversations')
         
-    def save_conversation(self, history: List[Dict[str, Any]]) -> None:
-        """Save conversation history with timestamps."""
-        if not self.save_path:
-            logger.debug("No save path specified, skipping conversation save")
-            return
-            
+    async def initialize(self) -> None:
+        """Initialize the conversation saver."""
         try:
-            save_path = Path(self.save_path)
-            save_path.parent.mkdir(parents=True, exist_ok=True)
+            # Create save directory if it doesn't exist
+            Path(self.save_dir).mkdir(parents=True, exist_ok=True)
+            logger.info(f"Initialized conversation saver with directory: {self.save_dir}")
+        except Exception as e:
+            logger.error(f"Error initializing conversation saver: {str(e)}")
+            raise
             
-            # Add timestamps to history
-            timestamped_history = []
-            for entry in history:
-                timestamped_entry = entry.copy()
-                timestamped_entry['timestamp'] = datetime.now().isoformat()
-                timestamped_history.append(timestamped_entry)
+    async def save(self, conversation: Dict[str, Any]) -> str:
+        """Save a conversation to disk."""
+        try:
+            # Create filename with timestamp
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            filename = f"conversation_{timestamp}.json"
+            filepath = os.path.join(self.save_dir, filename)
             
-            # Save with pretty formatting
-            with open(save_path, 'w') as f:
-                json.dump(timestamped_history, f, indent=2)
+            # Add metadata
+            conversation['metadata'] = {
+                'timestamp': timestamp,
+                'version': '1.0'
+            }
+            
+            # Save conversation
+            with open(filepath, 'w', encoding='utf-8') as f:
+                json.dump(conversation, f, indent=2, ensure_ascii=False)
                 
-            logger.info(f"Successfully saved conversation to {save_path}")
+            logger.info(f"Saved conversation to: {filepath}")
+            return filepath
             
         except Exception as e:
             logger.error(f"Error saving conversation: {str(e)}")
+            return ""
             
-    def load_conversation(self) -> Optional[List[Dict[str, Any]]]:
-        """Load saved conversation history."""
-        if not self.save_path:
-            logger.debug("No save path specified, cannot load conversation")
-            return None
-            
+    async def load(self, filepath: str) -> Optional[Dict[str, Any]]:
+        """Load a conversation from disk."""
         try:
-            save_path = Path(self.save_path)
-            if not save_path.exists():
-                logger.debug(f"Save file does not exist: {save_path}")
-                return None
-                
-            with open(save_path, 'r') as f:
-                history = json.load(f)
-                
-            logger.info(f"Successfully loaded conversation from {save_path}")
-            return history
-            
+            with open(filepath, 'r', encoding='utf-8') as f:
+                conversation = json.load(f)
+            return conversation
         except Exception as e:
             logger.error(f"Error loading conversation: {str(e)}")
             return None
+            
+    async def list_conversations(self) -> list[str]:
+        """List all saved conversations."""
+        try:
+            files = []
+            for file in Path(self.save_dir).glob("conversation_*.json"):
+                files.append(str(file))
+            return sorted(files)
+        except Exception as e:
+            logger.error(f"Error listing conversations: {str(e)}")
+            return []

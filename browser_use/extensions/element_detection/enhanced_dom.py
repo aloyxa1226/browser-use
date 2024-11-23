@@ -1,89 +1,65 @@
-from bs4 import Tag
+"""Enhanced DOM service for advanced element detection."""
+
 import logging
+from typing import Optional, Dict, Any
+
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+
+from browser_use.browser.service import Browser
 
 logger = logging.getLogger(__name__)
 
-class EnhancedDomService:
-    """Enhanced DOM service with improved element detection capabilities."""
+class EnhancedDOMService:
+    """Enhanced DOM service with advanced element detection capabilities."""
     
-    @staticmethod
-    def is_interactive_element(element: Tag) -> bool:
-        """Enhanced check for interactive elements including cookie consent elements."""
-        interactive_elements = {
-            'a',
-            'button',
-            'input',
-            'select',
-            'textarea',
-            'summary',
-            'dialog',
-            'div',
-        }
-
-        interactive_roles = {
-            'button',
-            'link',
-            'menuitem',
-            'tab',
-            'checkbox',
-            'radio',
-            'switch',
-            'option',
-            'combobox',
-            'textbox',
-            'searchbox',
-            'slider',
-            'spinbutton',
-            'scrollbar',
-            'progressbar',
-            'tooltip',
-            'dialog',
-            'alertdialog',
-            'banner',
-            'menuitemcheckbox',
-            'menuitemradio',
-        }
-
-        return (
-            element.name in interactive_elements
-            or element.get('role') in interactive_roles
-            or element.get('aria-role') in interactive_roles
-            or element.get('tabindex') == '0'
-            or EnhancedDomService.is_cookie_consent_element(element)
-        )
-
-    @staticmethod
-    def is_cookie_consent_element(element: Tag) -> bool:
-        """Check if element is related to cookie consent."""
-        cookie_keywords = {
-            'cookie', 'cookies', 'consent', 'accept', 'agree', 'privacy',
-            'gdpr', 'ccpa', 'allow', 'accept all', 'got it', 'i accept',
-            'continue', 'ok', 'yes', 'dismiss'
-        }
+    def __init__(self, browser: Optional[Browser] = None):
+        """Initialize the DOM service."""
+        self.browser = browser
         
-        # Get text content
-        text = element.get_text(strip=True).lower()
-        
-        # Get common attributes
-        id_attr = element.get('id', '').lower()
-        class_attr = ' '.join(element.get('class', [])).lower()
-        aria_label = element.get('aria-label', '').lower()
-        data_attrs = ' '.join([v for k, v in element.attrs.items() if k.startswith('data-')]).lower()
-        
-        # Combine all searchable content
-        searchable_content = f"{text} {id_attr} {class_attr} {aria_label} {data_attrs}"
-        
-        # Check if any cookie-related keyword is present
-        return any(keyword in searchable_content for keyword in cookie_keywords)
-
-    @staticmethod
-    def is_visible_element(element: Tag) -> bool:
-        """Enhanced check for element visibility."""
-        return not (
-            element.get('style', '').lower().find('display: none') >= 0
-            or element.get('style', '').lower().find('visibility: hidden') >= 0
-            or element.get('hidden') is not None
-            or element.get('aria-hidden') == 'true'
-            or element.get('aria-disabled') == 'true'
-            or element.get('type') == 'hidden'
-        )
+    async def find_element(self, selector: str, context: Optional[Dict[str, Any]] = None) -> Optional[Any]:
+        """Find an element using enhanced detection strategies."""
+        try:
+            if not self.browser:
+                logger.warning("Browser instance not available")
+                return None
+                
+            # Try CSS selector first
+            try:
+                element = WebDriverWait(self.browser.driver, 10).until(
+                    EC.presence_of_element_located((By.CSS_SELECTOR, selector))
+                )
+                if element.is_displayed():
+                    return element
+            except:
+                pass
+                
+            # Try XPATH as fallback
+            try:
+                xpath_selector = f"//*[@{selector}]"
+                element = WebDriverWait(self.browser.driver, 5).until(
+                    EC.presence_of_element_located((By.XPATH, xpath_selector))
+                )
+                if element.is_displayed():
+                    return element
+            except:
+                pass
+                
+            # Try ARIA role if context specifies it
+            if context and 'role' in context:
+                try:
+                    role_selector = f"//*[@role='{context['role']}']"
+                    element = WebDriverWait(self.browser.driver, 5).until(
+                        EC.presence_of_element_located((By.XPATH, role_selector))
+                    )
+                    if element.is_displayed():
+                        return element
+                except:
+                    pass
+                    
+            return None
+            
+        except Exception as e:
+            logger.error(f"Error finding element: {str(e)}")
+            return None

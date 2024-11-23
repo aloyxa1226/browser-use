@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Optional, Type
+from typing import Optional, Type, Union, List, Dict, Any
 
 from openai import RateLimitError
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, create_model
@@ -51,12 +51,38 @@ class ActionResult(BaseModel):
 
 
 class AgentBrain(BaseModel):
-    """Current state of the agent"""
-
+    """Agent brain state and functionality."""
+    
+    browser: Optional[Browser] = Field(default=None, description="Browser instance")
+    extensions: Optional[ExtensionsManager] = Field(default=None, description="Extensions manager")
+    current_state: Optional[BrowserState] = Field(default=None, description="Current browser state")
+    conversation_history: List[Dict[str, Any]] = Field(default_factory=list, description="Conversation history")
     valuation_previous_goal: str
     memory: str
     next_goal: str
-    extensions: Optional[ExtensionsManager] = Field(default_factory=ExtensionsManager)
+    
+    class Config:
+        arbitrary_types_allowed = True
+        
+    async def update_state(self) -> None:
+        """Update the current browser state."""
+        if not self.browser or not self.browser.page:
+            logger.warning("Browser or page not available")
+            return
+            
+        try:
+            self.current_state = BrowserState(
+                url=self.browser.page.url,
+                title=await self.browser.page.title(),
+                html=await self.browser.page.content(),
+                text=await self.browser.page.inner_text("body")
+            )
+        except Exception as e:
+            logger.error(f"Error updating state: {str(e)}")
+            
+    def add_to_history(self, message: Dict[str, Any]) -> None:
+        """Add a message to the conversation history."""
+        self.conversation_history.append(message)
 
 
 class AgentOutput(BaseModel):

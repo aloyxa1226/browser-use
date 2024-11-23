@@ -11,15 +11,15 @@ This package provides additional features and improvements for the browser_use f
 """
 
 from browser_use.extensions.auth.login import LoginHandler
-from browser_use.extensions.conversation.saver import ConversationSaver
 from browser_use.extensions.cookie_consent.handler import CookieConsentHandler
-from browser_use.extensions.element_detection.enhanced_dom import EnhancedDomService
-from browser_use.extensions.resource_management.cleanup import ResourceManager
+from browser_use.extensions.conversation.saver import ConversationSaver
+from browser_use.extensions.element_detection.enhanced_dom import EnhancedDOMService
+from browser_use.extensions.resource_management.cleanup import ResourceCleanup
 
 __all__ = [
     'LoginHandler',
-    'ConversationSaver',
     'CookieConsentHandler',
-    'EnhancedDomService',
-    'ResourceManager',
+    'ConversationSaver',
+    'EnhancedDOMService',
+    'ResourceCleanup',
 ]
